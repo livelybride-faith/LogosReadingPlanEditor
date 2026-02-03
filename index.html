@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Logos Plan Editor Pro (Community Edition)</title>
+    <title>Logos Plan Editor</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eceff1; padding: 20px; line-height: 1.4; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 1200px; margin: auto; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 1400px; margin: auto; }
         h2 { color: #2c3e50; margin-top: 0; display: flex; align-items: center; justify-content: space-between; }
         .version { font-size: 12px; color: #95a5a6; font-weight: normal; }
         
@@ -19,10 +19,10 @@
         .toolbar { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 20px; flex-wrap: wrap; }
         
         .table-container { overflow-x: auto; margin-top: 10px; }
-        table { width: 100%; border-collapse: collapse; background: white; min-width: 800px; }
+        table { width: 100%; border-collapse: collapse; background: white; min-width: 1000px; }
         th { background: #f8f9fa; color: #546e7a; font-weight: 600; text-transform: uppercase; font-size: 10px; padding: 12px; border-bottom: 2px solid #eee; text-align: left; }
         td { padding: 6px; border-bottom: 1px solid #f0f0f0; }
-        input { border: 1px solid #dfe6e9; padding: 8px; border-radius: 4px; width: 100%; box-sizing: border-box; font-family: monospace; font-size: 13px; }
+        input { border: 1px solid #dfe6e9; padding: 8px; border-radius: 4px; width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12px; min-width:150px; }
         input:focus { border-color: #3498db; outline: none; background: #f7fbff; }
         
         .btn { padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; font-size: 13px; }
@@ -32,10 +32,10 @@
         .btn-danger { background: #e74c3c; color: white; padding: 5px 8px; font-size: 10px; }
         .btn-update { background: #f39c12; color: white; font-size: 10px; padding: 6px; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; }
         
-        .id-label { display: block; font-size: 9px; color: #95a5a6; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+        .id-label { display: block; font-size: 9px; color: #95a5a6; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+        .key-tag { font-size: 8px; background: #eee; padding: 2px 4px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
         
         footer { margin-top: 30px; font-size: 11px; color: #95a5a6; text-align: center; border-top: 1px solid #cfd8dc; padding-top: 15px; }
-        .disclaimer-text { max-width: 800px; margin: 10px auto; line-height: 1.6; }
     </style>
 </head>
 <body>
@@ -43,7 +43,7 @@
 <div class="card">
     <h2>
         Logos Reading Plan Editor 
-        <span class="version">MIT Licensed • v1.0.2</span>
+        <span class="version">Universal Format Support • v1.1.0</span>
     </h2>
     
     <div class="io-container">
@@ -67,9 +67,9 @@
         <table id="readingTable" style="display:none;">
             <thead>
                 <tr id="headerRow">
-                    <th style="width: 140px;">Date (YYYY-MM-DD)</th>
-                    <th style="width: 90px;">Sync Down</th>
-                    <th style="width: 50px;">Del</th>
+                    <th style="width: 130px;">Date</th>
+                    <th style="width: 80px;">Auto-Fill</th>
+                    <th style="width: 40px;">Del</th>
                 </tr>
             </thead>
             <tbody id="tableBody"></tbody>
@@ -77,69 +77,61 @@
     </div>
 
     <footer>
-        <div class="disclaimer-text">
-            <strong>MIT License:</strong> Free for public use. Provided "as-is" without warranty of any kind.<br>
-            <strong>Disclaimer:</strong> This tool is not affiliated with Faithlife or Logos Bible Software. 
-            Modifying reading plans can cause sync issues if JSON structures are malformed. Always keep a backup.
-        </div>
+        <strong>Pro Tip:</strong> Use the "Update" button to auto-increment dates and numbers (Page/Article IDs) for all following days.
     </footer>
 </div>
 
 <script>
 let planData = [];
 
-/**
- * Format Date to YYYY-MM-DD
- */
-const formatDate = (date) => date.toISOString().split('T')[0];
+// Helper: Identify which key holds the location value (reference, textRange, contentsEntry)
+const getValueKey = (resObj) => {
+    const keys = Object.keys(resObj);
+    return keys.find(k => k !== 'resourceId') || 'reference';
+};
 
-/**
- * Update the compressed output box
- */
+// Helper: Increment numbers found at the end of strings (e.g., page.88 -> page.89)
+const incrementString = (str) => {
+    return str.replace(/(\d+)(?!.*\d)/, (match) => {
+        return parseInt(match) + 1;
+    });
+};
+
 function updateOutputBox() {
     document.getElementById('jsonOutput').value = JSON.stringify(planData);
 }
 
-/**
- * Parse input and build table
- */
 function loadData() {
     try {
-        const raw = document.getElementById('jsonInput').value.trim();
-        if (!raw) return;
+        let raw = document.getElementById('jsonInput').value.trim();
+        // Handle cases where user pastes just the objects without outer brackets
+        if (raw.startsWith('{') && !raw.startsWith('[')) raw = '[' + raw + ']';
+        
         planData = JSON.parse(raw);
-        if (Array.isArray(planData) && planData.length > 0) {
+        if (Array.isArray(planData)) {
             setupHeaders();
             renderTable();
             updateOutputBox();
             document.getElementById('readingTable').style.display = 'table';
-        } else {
-            alert("Error: Input must be a JSON Array [ ... ]");
         }
     } catch (e) {
-        alert("Invalid JSON format. Please check for missing brackets or commas.");
+        alert("Invalid JSON format. Make sure it's a valid Array of days.");
     }
 }
 
-/**
- * Create dynamic resource headers
- */
 function setupHeaders() {
     const headerRow = document.getElementById('headerRow');
     while (headerRow.children.length > 3) headerRow.removeChild(headerRow.children[1]);
     
-    // Check first entry for resources
     const resources = planData[0].readings[0];
     resources.forEach((res, i) => {
+        const keyName = getValueKey(res);
         const th = document.createElement('th');
-        th.innerHTML = `<span class="id-label">${res.resourceId}</span>Res ${i+1}`;
+        th.innerHTML = `<span class="id-label">${res.resourceId}</span><span class="key-tag">${keyName}</span>Res ${i+1}`;
         headerRow.insertBefore(th, headerRow.lastElementChild.previousElementSibling);
     });
 }
 
-/**
- * Render the editable UI table
- */
 function renderTable() {
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
@@ -147,25 +139,26 @@ function renderTable() {
     planData.forEach((day, index) => {
         const tr = document.createElement('tr');
         
-        // Date Input
+        // Date
         const dateTd = document.createElement('td');
-        dateTd.innerHTML = `<input type="text" id="date-${index}" value="${day.date}" onchange="updateVal(${index}, 'date', this.value)">`;
+        dateTd.innerHTML = `<input type="text" value="${day.date}" onchange="updateVal(${index}, 'date', this.value)">`;
         tr.appendChild(dateTd);
         
-        // Resource Inputs
+        // Resources
         day.readings[0].forEach((res, resIdx) => {
+            const keyName = getValueKey(res);
+            const val = res[keyName] || "";
             const td = document.createElement('td');
-            const pageNum = res.reference.replace('page.', '');
-            td.innerHTML = `<input type="text" id="p-${index}-${resIdx}" value="${pageNum}" onchange="updatePage(${index}, ${resIdx}, this.value)">`;
+            td.innerHTML = `<input type="text" id="p-${index}-${resIdx}" value="${val}" onchange="updateResource(${index}, ${resIdx}, '${keyName}', this.value)">`;
             tr.appendChild(td);
         });
 
-        // Sync Button
+        // Auto-Fill Button
         const actionTd = document.createElement('td');
-        actionTd.innerHTML = `<button class="btn btn-update" title="Recalculate all days below this row" onclick="propagate(${index})">Update</button>`;
+        actionTd.innerHTML = `<button class="btn btn-update" onclick="propagate(${index})">Update</button>`;
         tr.appendChild(actionTd);
 
-        // Delete Button
+        // Delete
         const delTd = document.createElement('td');
         delTd.innerHTML = `<button class="btn btn-danger" onclick="removeDay(${index})">×</button>`;
         tr.appendChild(delTd);
@@ -179,63 +172,50 @@ function updateVal(idx, key, val) {
     updateOutputBox();
 }
 
-function updatePage(dayIdx, resIdx, val) { 
-    planData[dayIdx].readings[0][resIdx].reference = `page.${val}`; 
+function updateResource(dayIdx, resIdx, key, val) { 
+    planData[dayIdx].readings[0][resIdx][key] = val; 
     updateOutputBox();
 }
 
-/**
- * Cascade changes downward (Increment logic)
- */
 function propagate(startIndex) {
     for (let i = startIndex + 1; i < planData.length; i++) {
-        // Safe date incrementing (Noon UTC to avoid TZ shifts)
+        // Increment Date
         let d = new Date(planData[i-1].date + "T12:00:00");
         d.setDate(d.getDate() + 1);
-        const newDate = formatDate(d);
+        const newDate = d.toISOString().split('T')[0];
         planData[i].date = newDate;
-        
-        const dateInput = document.getElementById(`date-${i}`);
-        if(dateInput) dateInput.value = newDate;
 
-        // Page incrementing
-        planData[startIndex].readings[0].forEach((_, resIdx) => {
-            let prevRef = planData[i-1].readings[0][resIdx].reference;
-            let prevPage = parseInt(prevRef.replace('page.', '')) || 0;
-            const newPage = prevPage + 1;
-            planData[i].readings[0][resIdx].reference = `page.${newPage}`;
-            
-            const pageInput = document.getElementById(`p-${i}-${resIdx}`);
-            if(pageInput) pageInput.value = newPage;
+        // Increment Values for each resource
+        planData[i].readings[0].forEach((res, resIdx) => {
+            const keyName = getValueKey(res);
+            const prevVal = planData[i-1].readings[0][resIdx][keyName];
+            planData[i].readings[0][resIdx][keyName] = incrementString(prevVal);
         });
     }
+    renderTable();
     updateOutputBox();
 }
 
-/**
- * Append a new day to the end of the plan
- */
 function addNewDay() {
-    if (planData.length === 0) return alert("Load initial data first.");
+    if (planData.length === 0) return;
     const lastDay = planData[planData.length - 1];
     let d = new Date(lastDay.date + "T12:00:00");
     d.setDate(d.getDate() + 1);
     
     const newReadings = [lastDay.readings[0].map(res => {
-        let prevPage = parseInt(res.reference.replace('page.', '')) || 0;
-        return { 
-            resourceId: res.resourceId, 
-            reference: `page.${prevPage + 1}` 
-        };
+        const keyName = getValueKey(res);
+        const newRes = { resourceId: res.resourceId };
+        newRes[keyName] = incrementString(res[keyName]);
+        return newRes;
     })];
 
-    planData.push({ date: formatDate(d), readings: newReadings });
+    planData.push({ date: d.toISOString().split('T')[0], readings: newReadings });
     renderTable();
     updateOutputBox();
 }
 
 function removeDay(index) {
-    if(confirm("Remove this day from the plan?")) {
+    if(confirm("Remove this day?")) {
         planData.splice(index, 1);
         renderTable();
         updateOutputBox();
@@ -244,10 +224,9 @@ function removeDay(index) {
 
 function copyResult() {
     const copyText = document.getElementById("jsonOutput");
-    if(!copyText.value) return;
     copyText.select();
     document.execCommand("copy");
-    alert("Compressed JSON copied to clipboard. You can now paste this into your plan.");
+    alert("Copied to clipboard!");
 }
 </script>
 </body>
