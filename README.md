@@ -23,11 +23,11 @@ For example I want to update 3 / 4 resources in a reading plan without recreatin
 12. Click Apply button at the bottom right to Update the data.
 13. Open the Reading Plan in Logos, it should show tupdated pages. 
 
-# Note : 
+## Note : 
 Always keep a backup no matter what so that you can always revert. Best practice is to duplicate the original Reading Plan first, then backup the db as well so that you can always fall back to the untouched copy. 
 
-# Open Source
+## Open Source
 You can check all the code I used in the app.
 
-# Buy me a coffee
-PayPal
+## Buy me a coffee 
+[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/paypalme/MichelleYeow)
